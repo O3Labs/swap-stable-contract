@@ -1,0 +1,28 @@
+{
+    "lp_contract": "LPToken",
+    "lp_constructor": {
+        "symbol": "",
+        "name": ""
+    },
+    "swap_constructor": {
+        "_A": 200,
+        "_fee": 4000000
+    },
+    "coins": [
+        {
+            "decimals": 6,
+            "name": "",
+            "underlying_address": ""
+        },
+        {
+            "decimals": 6,
+            "name": "",
+            "underlying_address": ""
+        },
+        {
+            "decimals": 6,
+            "name": "",
+            "underlying_address": ""
+        }
+    ]
+}
