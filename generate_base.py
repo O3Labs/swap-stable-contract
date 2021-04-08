@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from pathlib import Path
+import shutil
 import sys
 import os
 
@@ -26,6 +27,12 @@ exec(open("brownie_hooks.py").read())
 poolFile = open(targetContractPath, 'w')
 poolFile.write(brownie_load_source(templatePath, sourceCode))
 poolFile.close()
+
+# Copy base template pooldata to pool dir
+shutil.copy(
+    './contracts/pool-templates/base/pooldata.json',
+    './contracts/pools/usd/pooldata.json'
+)
 
 print("Success")
 print("Pool contract generated at: ", targetContractPath)
