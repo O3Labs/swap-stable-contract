@@ -255,11 +255,23 @@ def calc_token_amount(_amounts: uint256[N_COINS], _is_deposit: bool) -> uint256:
     return diff * token_amount / D0
 
 
-@external
-@nonreentrant('lock')
-def add_liquidity(_amounts: uint256[N_COINS], _min_mint_amount: uint256) -> uint256:
+@view
+@internal
+def _get_coin_index(_coin: address) -> int128:
+    assert _coin != ZERO_ADDRESS
+
+    for x in range(N_COINS):
+        if self.coins[x] == _coin:
+            return x
+
+    raise
+
+
+@internal
+def _add_liquidity(_provider: address, _amounts: uint256[N_COINS], _min_mint_amount: uint256) -> uint256:
     """
     @notice Deposit coins into the pool
+    @param _provider Liquidity provider(usually is msg.sender)
     @param _amounts List of amounts of coins to deposit
     @param _min_mint_amount Minimum amount of LP tokens to mint from the deposit
     @return Amount of LP tokens received by depositing
@@ -319,7 +331,7 @@ def add_liquidity(_amounts: uint256[N_COINS], _min_mint_amount: uint256) -> uint
                 self.coins[i],
                 concat(
                     method_id("transferFrom(address,address,uint256)"),
-                    convert(msg.sender, bytes32),
+                    convert(_provider, bytes32),
                     convert(self, bytes32),
                     convert(_amounts[i], bytes32),
                 ),
@@ -330,11 +342,43 @@ def add_liquidity(_amounts: uint256[N_COINS], _min_mint_amount: uint256) -> uint
             # end "safeTransferFrom"
 
     # Mint pool tokens
-    CurveToken(lp_token).mint(msg.sender, mint_amount)
+    CurveToken(lp_token).mint(_provider, mint_amount)
 
-    log AddLiquidity(msg.sender, _amounts, fees, D1, token_supply + mint_amount)
+    log AddLiquidity(_provider, _amounts, fees, D1, token_supply + mint_amount)
 
     return mint_amount
+
+
+@external
+@nonreentrant('lock')
+def add_liquidity_one_coin(_token_amount: uint256, _coin: address, _min_mint_amount: uint256) -> uint256:
+    """
+    @notice Deposit a single coin into the pool
+    @param _token_amount Amount of coin to deposit
+    @param _coin Token address of the coin
+    @param _min_mint_amount Minimum amount of LP tokens to mint from the deposit
+    @return Amount of LP tokens received by depositing
+    """
+
+    i: int128 = self._get_coin_index(_coin) # will revert execution if not found
+    amounts: uint256[N_COINS] = empty(uint256[N_COINS])
+    amounts[i] = _token_amount
+
+    mint_amount: uint256 = self._add_liquidity(msg.sender, amounts, _min_mint_amount)
+    return mint_amount
+
+
+@external
+@nonreentrant('lock')
+def add_liquidity(_amounts: uint256[N_COINS], _min_mint_amount: uint256) -> uint256:
+    """
+    @notice Deposit coins into the pool
+    @param _amounts List of amounts of coins to deposit
+    @param _min_mint_amount Minimum amount of LP tokens to mint from the deposit
+    @return Amount of LP tokens received by depositing
+    """
+
+    return self._add_liquidity(msg.sender, _amounts, _min_mint_amount)
 
 
 @view
@@ -660,15 +704,17 @@ def calc_withdraw_one_coin(_token_amount: uint256, i: int128) -> uint256:
 
 @external
 @nonreentrant('lock')
-def remove_liquidity_one_coin(_token_amount: uint256, i: int128, _min_amount: uint256) -> uint256:
+def remove_liquidity_one_coin(_token_amount: uint256, _coin: address, _min_amount: uint256) -> uint256:
     """
     @notice Withdraw a single coin from the pool
     @param _token_amount Amount of LP tokens to burn in the withdrawal
-    @param i Index value of the coin to withdraw
+    @param _coin Token address of the coin
     @param _min_amount Minimum amount of coin to receive
     @return Amount of coin received
     """
     assert not self.is_killed  # dev: is killed
+
+    i: int128 = self._get_coin_index(_coin) # will revert execution if not found
 
     dy: uint256 = 0
     dy_fee: uint256 = 0
